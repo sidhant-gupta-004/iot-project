@@ -17,10 +17,11 @@ void setup()
   while (!wifiSerial) {
     ; // wait for serial port to connect. Needed for Leonardo only
   }
-  sendToWifi("AT+CWMODE=2",responseTime,DEBUG); // configure as access point
+  sendToWifi("AT+CWMODE_CUR=2",responseTime,DEBUG); // configure as access point
   sendToWifi("AT+CIFSR",responseTime,DEBUG); // get ip address
   sendToWifi("AT+CIPMUX=1",responseTime,DEBUG); // configure for multiple connections
   sendToWifi("AT+CIPSERVER=1,80",responseTime,DEBUG); // turn on server on port 80
+  sendToWifi("AT+CWDHCP_CUR=0,1",responseTime,DEBUG);
  
   sendToUno("Wifi connection is running!",responseTime,DEBUG);
   
@@ -191,6 +192,3 @@ String sendToUno(String command, const int timeout, boolean debug){
   }
   return response;
 }
-
-
-
