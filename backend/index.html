@@ -24,24 +24,15 @@
     var socket = io();
     $('form').submit(function(e){
         
-        socket.emit('Chat',$('#m').val());
-       $('#messages').append($('<li>').text($('#m').val()));
-        e.preventDefault();
-    });
-    socket.on('userDisconnect',function(clients){
-        $('#messages').append($('<li>').text('User disconnected total clients: '+clients));
-    });
-    socket.on('userConnect',function(clients){
-        $('#messages').append($('<li>').text('New User connected! total clients: '+clients));
+      socket.emit('Command',$('#m').val());
+      $('#messages').append($('<li>').text($('#m').val()));
+      e.preventDefault();
     });
 
-    socket.on('message',function(msg){
-        $('#messages').append($('<li>').text(msg));
-    });
+    socket.on('message',function(){
 
-    socket.on('Chat',function(msg){
-        $('#messages').append($('<li>').text(msg));
     });
+    
     </script>
   </body>
 </html>
