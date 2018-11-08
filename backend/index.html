@@ -29,8 +29,8 @@
       e.preventDefault();
     });
 
-    socket.on('message',function(){
-
+    socket.on('message',function(data){
+      $('#messages').append($('<li>').text(data));
     });
     
     </script>

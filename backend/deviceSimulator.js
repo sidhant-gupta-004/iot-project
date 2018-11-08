@@ -14,46 +14,82 @@ function Simulator(brokerURI,clientId,socket){
     });
     self.socket = socket;
     self.threshold = 82;
+    self.buzzerState = 'off';
     console.log('Simulator created..');
 }
 
 Simulator.prototype.onConnect = function(statusEvent){
     var self = this;
     if(statusEvent.category === "PNConnectedCategory"){
-        console.log('connection established..Simulator side..');
+        console.log('Simulator connection to PubNub established');
         /* Write all the publishers and subscribers for the topic over here */
         self.client.publish({
             message:{
                 connected:'true'
             },
-            channel:'sensor/threshold/connected'
-        },
-        function(status,response){
-            if(status.error){
-                console.log(status);
-            }
-            else{
-                console.log('Connected message published from simulator');
-            }
-        });
+            channel:'sensor/connected'
+        },promiseReject);
+    }else{
+        console.log("Connection failed..",statusEvent.category);
     }
+    
 }
 
 Simulator.prototype.onMessage = function(message){
-    console.log(message);
-}
-
-Simulator.prototype.handleThresholdChange = function(message){
     var self = this;
-    self.threshold = message;
-    // self.client.publish('sensor/threshold/change','true');
+    let channel = message.channel;
+    let content = message.content;
+    switch(channel){
+        case 'sensor/threshold':
+            return self.handleThreshold(content);
+        case 'sensor/buzzer':
+            return self.handleBuzzer(content);
+    }
+    
 }
 
-Simulator.prototype.handleThresholdShow = function(message){
-    // self.client.publish('sensor/threshold/show',self.threshold);
+Simulator.prototype.handleThreshold = function(message){
+    var self = this;
+    if(message.type == 'show'){
+        self.client.publish({
+            message:{
+                type: 'showValue',
+                thresholdValue: self.threshold
+            },
+            channel:['sensor/threshold']
+        },promiseReject);
+    }else if (message.type = 'change'){
+        self.threshold = message.thresholdValue;
+        self.client.publish({
+            message:{
+                type: 'changeSuccess',
+                thresholdValue:self.threshold
+            },
+            channel:['sensor/threshold']
+        },promiseReject);
+    }
+   
 }
 
+Simulator.prototype.handleBuzzer  = function(message){
+    var self = this;
+    if(message.state = 'on'){
+        self.client.publish({
+            message:{
+                
+            }
+        },promiseReject)
+    }
+}
 
+function promiseReject(status,response){
+    if(status.error){
+        console.log("Error Occured while publishing from simulator");
+    }
+    else{
+        console.log("Successfully published from simulator")
+    }
+}
 module.exports = Simulator;
 
 
