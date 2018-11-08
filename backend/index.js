@@ -19,6 +19,7 @@ app.get('/',function(req,res){
 io.on('connection',function(socket){
     let sensorObject = new sensor(brokerURI,clientId,socket);
     let controllerObject = new controller(brokerURI,clientId,socket);
+    
 
 });
 

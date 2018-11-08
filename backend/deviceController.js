@@ -1,6 +1,6 @@
 const express = require('express');
 const pubnub = require('pubnub');
-
+let sensorConnected = false
 /* Controller Constructor */
 function Controller(brokerURI,clientId,socket){
     var self = this;
@@ -20,59 +20,101 @@ Controller.prototype.onConnect = function(statusEvent){
     /* Write all the publishers and subscribers for the topic over here */
     var self = this;
     if(statusEvent.category === "PNConnectedCategory"){
-        console.log('connection established..Controller side..');
+        console.log('Controller connection to PubNub established');
         /* Write all the publishers and subscribers for the topic over here */
         
+    }else{
+        console.log("Connection failed..",statusEvent.category);
     }
 }
     
 
 
 Controller.prototype.onMessage = function(message){
-    console.log(message);
-    // switch(topic){
-    //     case 'sensor/connected':
-    //         return self.handleSensorConnected(message);
-    //     case 'sensor/abnormality':
-    //         return self.handleAbnormality(message);
-    //     case 'sensor/threshold/show':
-    //         return self.handleShowThreshold(message);
-    //     case 'sensor/threshold/change':
-    //         return self.handleChangedThreshold(message);
-    // }
+   var self = this;
+   let channel = message.channel;
+   let content = message.message;
+   switch(channel){
+        case 'sensor/connected':
+            return self.handleSensorConnected(content);
+        case 'sensor/abnormality':
+            return self.handleAbnormality(content);
+        case 'sensor/threshold':
+            return self.handleThreshold(content);
+       
+   }
 }
 
 
 
 Controller.prototype.handleSensorConnected = function(message){
-    // let sensorConnected = (message.toString() == 'true');
-    // if(sensorConnected){
-    //     socket.send('Device connected successfully!');
-    // }
-    // else{
-    //     socket.send('Failed to connect to remote device');
-    // }
+    var self = this;
+    let sensorConnected = (message.connected == 'true');
+    if(sensorConnected){
+        self.socket.send('Device connected successfully!');
+    }
+    else{
+        self.socket.send('Failed to connect to remote device');
+    }
 }
 
 Controller.prototype.handleAbnormality = function(message){
-    // var self = this;
-    // socket.send('Abnormal temperature detected!');
+    var self = this;
+    self.socket.send('Abnormal temperature detected!');
 }
 
-Controller.prototype.handleChangedThreshold = function(mesage){
-    // var self = this;
-    // if(message.toString() === 'true'){
-    //     socket.send('Threshold setting changed successfully!');
-    // }
-    // else{
-    //     socket.send('Some error occured in changing threshold setting');
-    // }
-    
+Controller.prototype.handleThreshold = function(mesage){
+    if(message.type == 'showValue'){
+        self.socket.send("Current Threshold value: " + message.thresholdValue);
+    }
+    else if(message.type == 'changeSuccess'){
+        self.socket.send('Threshold value changed Successfully new threshold value: ' + message.thresholdValue);
+    }
 }
 
-Controller.prototype.handleShowThreshold = function(message){
-    // socket.send('Current Temperature Threshold setting: '+message.toString());
+Controller.prototype.changeThreshold = function(thresholdValue){
+    var self = this;
+    self.client.publish({
+        message:{
+            type:'change',
+            thresholdValue:thresholdValue
+        },
+        channel:['sensor/threshold']
+    },promiseReject);
 }
+
+Controller.prototype.showThreshold = function(){
+    var self = this;
+    self.client.publish({
+        message:{
+            type:'show'
+        },
+        channel:['sensor/threshold']
+    },promiseReject);
+}
+
+Controller.prototype.onBuzzer = function(buzzerState){
+    var self = this;
+    self.client.publish({
+        message:{
+            state:buzzerState
+        },
+        channel:['sensor/buzzer']
+    },promiseReject);
+}
+
+
+function promiseReject(status,response){
+    if(status.error){
+        console.log("Error Occured while publishing from contoller");
+    }
+    else{
+        console.log("Successfully published from controller")
+    }
+}
+
 
 module.exports = Controller;
+
+
 
