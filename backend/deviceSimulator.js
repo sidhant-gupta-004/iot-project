@@ -1,16 +1,15 @@
 const pubnub = require('pubnub');
-
-
+const Promise = require('bluebird');
 /* Simulator Constructor */
-function Simulator(brokerURI,clientId,socket){
+function Simulator(publishKey,subscribeKey,socket){
     var self = this;
-    this.client = new pubnub({publishKey:'pub-c-957647d4-c417-4a35-969f-95d00a04a33f',subscribeKey:'sub-c-0bbe0cb0-e2b6-11e8-a575-5ee09a206989'});
+    this.client = new pubnub({publishKey:publishKey,subscribeKey:subscribeKey});
     self.client.addListener({
         status: self.onConnect.bind(self),
         message: self.onMessage.bind(self)
     })
     self.client.subscribe({
-        channels:['sensor/threshold/change','sensor/threshold/show','sensor/buzzer/on']
+        channels:['sensor/threshold/show','sensor/buzzer','sensor/threshold/change']
     });
     self.socket = socket;
     self.threshold = 82;
@@ -30,19 +29,20 @@ Simulator.prototype.onConnect = function(statusEvent){
             channel:'sensor/connected'
         },promiseReject);
     }else{
-        console.log("Connection failed..",statusEvent.category);
+       
     }
     
 }
 
 Simulator.prototype.onMessage = function(message){
     var self = this;
-    let channel = message.channel;
-    let content = message.content;
+    let channel = message.channel.split('/')[1];
+    let content = message.message;
+    console.log(channel,content,"Simulator");
     switch(channel){
-        case 'sensor/threshold':
+        case 'threshold':
             return self.handleThreshold(content);
-        case 'sensor/buzzer':
+        case 'buzzer':
             return self.handleBuzzer(content);
     }
     
@@ -56,16 +56,16 @@ Simulator.prototype.handleThreshold = function(message){
                 type: 'showValue',
                 thresholdValue: self.threshold
             },
-            channel:['sensor/threshold']
+            channel:['sensor/threshold/showValue']
         },promiseReject);
-    }else if (message.type = 'change'){
+    }else if (message.type == 'change'){
         self.threshold = message.thresholdValue;
         self.client.publish({
             message:{
                 type: 'changeSuccess',
                 thresholdValue:self.threshold
             },
-            channel:['sensor/threshold']
+            channel:['sensor/threshold/changeSuccess']
         },promiseReject);
     }
    
