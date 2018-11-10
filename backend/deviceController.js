@@ -2,29 +2,35 @@ const express = require('express');
 const pubnub = require('pubnub');
 let sensorConnected = false
 /* Controller Constructor */
-function Controller(brokerURI,clientId,socket){
+function Controller(publishKey,subscribeKey,socket){
     var self = this;
-    self.client = new pubnub({publishKey:'pub-c-957647d4-c417-4a35-969f-95d00a04a33f',subscribeKey:'sub-c-0bbe0cb0-e2b6-11e8-a575-5ee09a206989'});
+    self.cloudConnected  = false;
+    self.client = new pubnub({publishKey:publishKey,subscribeKey:subscribeKey});
     self.client.addListener({
         status: self.onConnect.bind(self),
         message: self.onMessage.bind(self)
     });
     self.client.subscribe({
-        channels:['sensor/connected','sensor/threshold/show','sensor/abnormality','sensor/threshold/change']
+        channels:['sensor/connected','sensor/threshold/showValue','sensor/abnormality','sensor/threshold/changeSuccess']
     });
     self.socket = socket;
     console.log('Controller created..');
 }
 
+
+
 Controller.prototype.onConnect = function(statusEvent){
     /* Write all the publishers and subscribers for the topic over here */
     var self = this;
     if(statusEvent.category === "PNConnectedCategory"){
+        self.cloudConnected = true;
         console.log('Controller connection to PubNub established');
+       
+       
         /* Write all the publishers and subscribers for the topic over here */
         
     }else{
-        console.log("Connection failed..",statusEvent.category);
+        
     }
 }
     
@@ -32,14 +38,15 @@ Controller.prototype.onConnect = function(statusEvent){
 
 Controller.prototype.onMessage = function(message){
    var self = this;
-   let channel = message.channel;
+   let channel = message.channel.split('/')[1];
    let content = message.message;
+   console.log(channel,content,"Controller");
    switch(channel){
-        case 'sensor/connected':
+        case 'connected':
             return self.handleSensorConnected(content);
-        case 'sensor/abnormality':
+        case 'abnormality':
             return self.handleAbnormality(content);
-        case 'sensor/threshold':
+        case 'threshold':
             return self.handleThreshold(content);
        
    }
@@ -63,7 +70,8 @@ Controller.prototype.handleAbnormality = function(message){
     self.socket.send('Abnormal temperature detected!');
 }
 
-Controller.prototype.handleThreshold = function(mesage){
+Controller.prototype.handleThreshold = function(message){
+    var self = this;
     if(message.type == 'showValue'){
         self.socket.send("Current Threshold value: " + message.thresholdValue);
     }
@@ -79,7 +87,7 @@ Controller.prototype.changeThreshold = function(thresholdValue){
             type:'change',
             thresholdValue:thresholdValue
         },
-        channel:['sensor/threshold']
+        channel:['sensor/threshold/change']
     },promiseReject);
 }
 
@@ -89,7 +97,7 @@ Controller.prototype.showThreshold = function(){
         message:{
             type:'show'
         },
-        channel:['sensor/threshold']
+        channel:['sensor/threshold/show']
     },promiseReject);
 }
 
