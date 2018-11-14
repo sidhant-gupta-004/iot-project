@@ -7,10 +7,23 @@
 #include "WiFiManager.h"
 
 
+
 String pub_key = "pub-c-957647d4-c417-4a35-969f-95d00a04a33f";
 String sub_key = "sub-c-0bbe0cb0-e2b6-11e8-a575-5ee09a206989";
-String timestamp;
+double saved_threshold = 60;
 
+
+// Structure for channel metadata
+struct chann
+{
+  String name;
+  String timestamp;
+};
+
+//struct chann user_settings;
+struct chann alarm = {"alarm", "0"};
+struct chann temperature = {"temperature", "0"};
+struct chann user_settings = {"user_settings", "0"};
 
 String urlencode(String str)
 {
@@ -59,16 +72,19 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 void setup() {
   
   Serial.begin(115200);
+
+  
+  
   
   //WiFiManager
   
   WiFiManager wifiManager;
   
-  
+  pinMode(16,OUTPUT);
   //reset settings - for testing
   wifiManager.setAPCallback(configModeCallback);
 
-  Serial.println("Kuchh ho raha hai.");
+  
   if(!wifiManager.autoConnect()) {
     Serial.println("failed to connect and hit timeout");
     
@@ -78,7 +94,7 @@ void setup() {
 
   Serial.println("Connected to WiFi");
 
-  timestamp = "0";
+  //timestamp = "0";
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -94,7 +110,7 @@ String publish_request (String channel, String msg, String signature, String cal
   String Link = "http://pubsub.pubnub.com/publish/";//pub-c-957647d4-c417-4a35-969f-95d00a04a33f/sub-c-0bbe0cb0-e2b6-11e8-a575-5ee09a206989/0/test/0/%22Hello%20World%22";
   Link += pub_key + "/" + sub_key;  // {publish_key}/{subscribe_key}
   Link += "/" + signature + "/";    // {signature}
-  Link += channel + "/";            // {channel_name}
+  Link += channel + "/";            // {channname}
   Link += callback + "/";          // {callback_function}
   Link += msg;                      // {message}
   //Serial.println(Link);
@@ -105,15 +121,15 @@ String publish_request (String channel, String msg, String signature, String cal
   int httpCode = http.GET();            //Send the request
   String payload = http.getString();    //Get the response payload
 
-  Serial.println(httpCode);   //Print HTTP return code
-  Serial.println(payload);    //Print request response payload
+//  Serial.println(httpCode);   //Print HTTP return code
+//  Serial.println(payload);    //Print request response payload
 
   http.end();  //Close connection
 
   return payload;
 }
 
-String subscribe_request (String channel, String callback)
+String subscribe_request (chann* channel, String callback)
 {
   
   HTTPClient http;
@@ -121,12 +137,12 @@ String subscribe_request (String channel, String callback)
   // Subscribe wala code
   String Link = "http://pubsub.pubnub.com/subscribe/";//sub-c-0bbe0cb0-e2b6-11e8-a575-5ee09a206989/threshold/0/" + timestamp;
   Link += sub_key + "/";
-  Link += channel;
+  Link += channel->name;
   Link += "/" + callback + "/";
-  Link += timestamp;
+  Link += channel->timestamp;
   //Serial.println(Link);
-
-  //Serial.println(timestamp);
+  
+  Serial.println(channel->timestamp);
   http.begin(Link);
   
   int httpCode = http.GET();
@@ -137,23 +153,26 @@ String subscribe_request (String channel, String callback)
 
   int i;
   String ret = "";
+  Serial.println(payload);
   if (httpCode == 200)
   {
     //Serial.println(payload);
     ret = parse_(payload);
-    Serial.println(ret);
     
-    timestamp = "";
+    
+    channel->timestamp = "";
     for (i=0;payload[i]!=']';i++);
 
     i += 3;
     for (; payload[i]!='"'; i++)
     {
-      timestamp += payload[i];
+      channel->timestamp += payload[i];
     }
+    
   }
 
   http.end();
+  Serial.println(channel->timestamp);
   
   return ret;
 
@@ -163,7 +182,7 @@ String parse_ (String input)
 {
   if (input[2] == ']')
   {
-    return input;
+    return "";
   }
   int i;
   for (i=0; input[i]!=':'; i++);
@@ -179,30 +198,104 @@ String parse_ (String input)
 }
 
 
-void light_jala_mc (String channel, String callback)
+String command (chann* channel, String callback)
 {
   String instruction = subscribe_request(channel, callback);
-
+  Serial.println(instruction);
   if (instruction == "LED ON")
   {    
     
     digitalWrite(LED_BUILTIN, LOW);
-    Serial.println("Instruction: LED On");  // turn the LED off by making the voltage LOW
+    Serial.println("Instruction: LED ON");  // turn the LED off by making the voltage LOW
     delay(1000);
     
-    publish_request (channel, urlencode("{\"message\":\"Done\"}"), "0", "0");
+    publish_request (channel->name, urlencode("{\"message\":\"Done\"}"), "0", "0");
   }
   else if (instruction == "LED OFF")
   {
     
     digitalWrite(LED_BUILTIN, HIGH);
-    Serial.println("Instruction: LED Off"); // turn the LED off by making the voltage LOW
+    Serial.println("Instruction: LED OFF"); // turn the LED off by making the voltage LOW
     delay(1000);
     
-    publish_request (channel, urlencode("{\"message\":\"Done\"}"), "0", "0");
+    publish_request (channel->name, urlencode("{\"message\":\"Done\"}"), "0", "0");
   }
+  else if (instruction == "ALARM OFF")
+  {
+    digitalWrite(LED_BUILTIN, HIGH);
+    tone(16, 0);
+    Serial.println("Instruction: ALARM OFF");
+
+    publish_request (channel->name, urlencode("{\"message\":\"Done\"}"), "0", "0");
+  }
+  else
+  {
+      String num = instruction;
+      Serial.println("User settings timestamp: " + String(user_settings.timestamp));
+      Serial.print("Threshold recieved: "+num);
+      if (num != "")
+      {
+          double n = (double)num.toInt();
+          if ( n > 20 )
+          {
+            saved_threshold = n;
+          }
+      }
+
+  }
+
+  return instruction;
 }
 
+void raise_alarm ()
+{
+    digitalWrite(LED_BUILTIN,LOW);
+    tone(16, 500);
+    delay(500);
+    tone(16, 1000);
+    digitalWrite(LED_BUILTIN,HIGH);
+    
+}
+
+double get_temp ()
+{
+  double analogValue = analogRead(A0);
+  Serial.print("Sensor Value: ");
+  Serial.print(analogValue);
+  
+  delay(500);
+  double analogVolts = (analogValue * 3.3)/1024;
+  double temp = (analogVolts - 0.5) * 100;
+  Serial.print(" Voltage: ");
+  Serial.print(analogVolts);
+  Serial.print(" Temperature: ");
+  Serial.println(temp);
+  return temp;
+  
+}
+
+double set_temp ()
+{
+  String num = subscribe_request (&user_settings, "0");
+  Serial.println("User settings timestamp: " + String(user_settings.timestamp));
+  Serial.print("Threshold recieved: "+num);
+  if (num == "")
+  {
+    return 0;
+  }
+  double n = (double)num.toInt();
+  return n;
+}
+
+
+void send_temp (double temp, String channel)
+{
+  String t = String(temp);
+  publish_request(channel, urlencode("{\"message\":\""+t+"\"}"), "0", "0");
+}
+
+
+int counter = 0;
 void loop ()
 {
   
@@ -210,8 +303,40 @@ void loop ()
   //delay(1000);
   //subscribe_request("connected", "0");
 
-  light_jala_mc("LED", "0");
+  //command("LED", "0");
   
-  //delay(1000);  // 1 second interval between each new round
+  command(&user_settings, "0");
+
+  counter += 1;
+  counter = counter%5;
+  double currentTemp = get_temp();
+  if (!counter)
+  {
+    send_temp(currentTemp, temperature.name);
+  }
+
+  Serial.println(saved_threshold);
+  if ( currentTemp > saved_threshold )
+  {
+
+    publish_request(alarm.name, urlencode("{\"message\":\"House-is-on-fire\",\"temperature\":\"" + String(currentTemp) + "\"}"), "0", "0");
+    
+    while (1)
+    {
+      raise_alarm();
+
+      //double t = set_temp();
+    
+      String cmd = command(&user_settings, "0");
+      if (cmd == "ALARM OFF")
+      {
+        break;
+      }
+    }
+  }
+
+  
+  
+  delay(1000);  // 1 second interval between each new round
 
 }
