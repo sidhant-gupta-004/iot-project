@@ -307,14 +307,16 @@ void loop ()
   
   command(&user_settings, "0");
 
-  counter += 1;
-  counter = counter%5;
-  double currentTemp = get_temp();
-  if (!counter)
-  {
-    send_temp(currentTemp, temperature.name);
-  }
+//  counter += 1;
+//  counter = counter%5;
+    double currentTemp = get_temp();
+//  if (!counter)
+//  {
+//    send_temp(currentTemp, temperature.name);
+//  }
 
+
+  send_temp(currentTemp, temperature.name);
   Serial.println(saved_threshold);
   if ( currentTemp > saved_threshold )
   {
