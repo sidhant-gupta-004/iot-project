@@ -1,2 +1,2 @@
-backend/node_modules/
-backend/package-lock.json
+web-client/node_modules/
+web-client/package-lock.json
